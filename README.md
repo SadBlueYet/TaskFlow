@@ -1,4 +1,4 @@
-# Trello Clone
+# Task Flow
 
 A Trello-like project built with FastAPI, SQLAlchemy, PostgreSQL, and React.
 
