@@ -1,4 +1,5 @@
 from typing import Sequence
+import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -10,6 +11,8 @@ from src.models.card import Card
 from src.schemas.board import BoardListCreate, BoardListUpdate
 from src.schemas.list import ResponseBoardList
 from .base import SqlAlchemyRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ListRepository(SqlAlchemyRepository):
@@ -80,8 +83,7 @@ class ListRepository(SqlAlchemyRepository):
         board_lists = await self.get_board_lists(list_obj.board_id)
 
         old_position = list_obj.position
-        print(f"Reordering list {list_id} to position {new_position}")
-        print(f"Old position: {old_position}")
+        logger.debug(f"Reordering list {list_id} from position {old_position} to {new_position}")
         for l in board_lists:
             if old_position < new_position:
                 if l.position > old_position and l.position <= new_position:

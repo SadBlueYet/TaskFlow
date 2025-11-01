@@ -1,6 +1,7 @@
 import api from '../api/axios';
 import { Board, BoardShare } from '../store/types';
 import { API_ENDPOINTS } from '../config';
+import { logger } from '../utils/logger';
 
 interface CreateBoardData {
     title: string;
@@ -30,7 +31,7 @@ export const boardService = {
             const response = await api.get<any[]>(API_ENDPOINTS.BOARDS.LIST);
 
             if (!Array.isArray(response.data)) {
-                console.error('API response is not an array:', response.data);
+                logger.error('API response is not an array:', response.data);
                 return [];
             }
 
@@ -40,7 +41,7 @@ export const boardService = {
             }));
             return boards;
         } catch (error) {
-            console.error('Error in getBoards:', error);
+            logger.error('Error in getBoards:', error);
             throw error;
         }
     },
@@ -60,7 +61,7 @@ export const boardService = {
                 : []
         };
 
-        console.log('Processed board data:', JSON.stringify(board, null, 2));
+        logger.log('Processed board data:', JSON.stringify(board, null, 2));
         return board;
     },
 
@@ -87,25 +88,25 @@ export const boardService = {
     // Методы для управления доступом к доскам
     async getBoardShares(boardId: number): Promise<BoardShare[]> {
         try {
-            console.log(`Fetching board shares from: ${API_ENDPOINTS.BOARDS.SHARES.LIST(boardId)}`);
+            logger.log(`Fetching board shares from: ${API_ENDPOINTS.BOARDS.SHARES.LIST(boardId)}`);
             const response = await api.get<BoardShare[]>(API_ENDPOINTS.BOARDS.SHARES.LIST(boardId));
-            console.log(`Board shares API response:`, response.data);
+            logger.log(`Board shares API response:`, response.data);
 
             // Validate response format
             if (!Array.isArray(response.data)) {
-                console.error('API response is not an array:', response.data);
+                logger.error('API response is not an array:', response.data);
                 return [];
             }
 
             // Check if each share has the correct format
             const validShares = response.data.filter(share => {
                 if (!share || typeof share !== 'object') {
-                    console.error('Invalid share object:', share);
+                    logger.error('Invalid share object:', share);
                     return false;
                 }
 
                 if (!share.id || !share.user || !share.access_type) {
-                    console.error('Share missing required properties:', share);
+                    logger.error('Share missing required properties:', share);
                     return false;
                 }
 
@@ -114,7 +115,7 @@ export const boardService = {
 
             return validShares;
         } catch (error) {
-            console.error(`Error fetching board shares for board ${boardId}:`, error);
+            logger.error(`Error fetching board shares for board ${boardId}:`, error);
             throw error;
         }
     },
