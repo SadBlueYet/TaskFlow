@@ -1,6 +1,7 @@
 import api from '../api/axios';
 import { Card, Comment } from '../store/types';
 import { API_ENDPOINTS } from '../config';
+import { logger } from '../utils/logger';
 
 interface CreateCardData {
     title: string;
@@ -33,9 +34,9 @@ export const cardService = {
     },
 
     async updateCard(cardId: number, data: UpdateCardData): Promise<Card> {
-        console.log(`Updating card ${cardId} with data:`, data);
+        logger.log(`Updating card ${cardId} with data:`, data);
         const response = await api.put<Card>(API_ENDPOINTS.CARDS.UPDATE(cardId), data);
-        console.log(`Card update response:`, response.data);
+        logger.log(`Card update response:`, response.data);
         return response.data;
     },
 

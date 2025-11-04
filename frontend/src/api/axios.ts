@@ -1,10 +1,8 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
 import { API_BASE_URL, API_ENDPOINTS } from '../config';
+import { logger } from '../utils/logger';
 
-console.log('Configuring API with base URL:', API_BASE_URL);
-
-// Track if this is a first request to enable retry logic for Safari
-let isFirstRequest = true;
+logger.info('Configuring API with base URL:', API_BASE_URL);
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -18,13 +16,12 @@ const axiosInstance = axios.create({
   timeout: 10000, // 10 seconds
 });
 
-// Add request logging
+// Request interceptor - logs requests in dev mode
 axiosInstance.interceptors.request.use(
   (config) => {
     // Log all requests except OPTIONS
     if (config.method?.toUpperCase() !== 'OPTIONS') {
-      console.log(`Request: ${config.method?.toUpperCase()} ${config.url}`,
-                 { withCredentials: config.withCredentials });
+      logger.log(`→ ${config.method?.toUpperCase()} ${config.url}`);
     }
 
     // Don't add headers for OPTIONS requests
@@ -34,43 +31,11 @@ axiosInstance.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('Request error:', error);
+    logger.error('Request error:', error);
     return Promise.reject(error);
   }
 );
 
-// Add response logging and retry for Safari CORS issues
-axiosInstance.interceptors.response.use(
-  (response) => {
-    console.log(`Response: ${response.status} from ${response.config.url}`);
-    isFirstRequest = false; // Mark that we've had a successful request
-    return response;
-  },
-  async (error: AxiosError) => {
-    const config = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-    // Only retry for first request with network error (typical Safari CORS issue)
-    if (isFirstRequest && !error.response && config && !config._retry) {
-      console.log('First request failed with network error, retrying after delay...');
-      config._retry = true;
-      isFirstRequest = false; // Don't retry more than once
-
-      // Wait a brief moment before retrying
-      await new Promise(resolve => setTimeout(resolve, 100));
-      return axiosInstance(config);
-    }
-
-    if (error.response) {
-      console.error(`Error response: ${error.response.status} from ${error.config?.url}`,
-                   error.response.data);
-    } else if (error.request) {
-      console.error('Error with request (no response):', error.message);
-    } else {
-      console.error('Error:', error.message);
-    }
-    return Promise.reject(error);
-  }
-);
 
 // Keep track of whether a refresh request is already in progress
 let isRefreshing = false;
@@ -89,11 +54,24 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Response interceptor
+// Response interceptor - handles logging, auth refresh, and error formatting
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log successful responses in dev mode
+    logger.log(`✓ ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config;
+
+    // Log error responses
+    if (error.response) {
+      logger.error(`✗ ${error.response.status} ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`);
+    } else if (error.request) {
+      logger.error('✗ Network error (no response):', error.message);
+    } else {
+      logger.error('✗ Request error:', error.message);
+    }
 
     if (!originalRequest) {
       return Promise.reject(error);
@@ -145,7 +123,7 @@ axiosInstance.interceptors.response.use(
 
         // Only redirect to login page if not already there
         if (window.location.pathname !== '/login') {
-          console.log('Refresh token failed, redirecting to login');
+          logger.warn('Refresh token failed, redirecting to login');
           window.location.href = '/login';
         }
       } finally {

@@ -7,6 +7,7 @@ import { fetchBoard, setCurrentBoard, updateBoard } from '../store/board.slice';
 import { Board, Card } from '../store/types';
 import { listService } from '../services/list.service';
 import { cardService } from '../services/card.service';
+import { logger } from '../utils/logger';
 import {
   Button,
   Input,
@@ -227,22 +228,6 @@ const AddItemForm: React.FC<{
   </form>
 );
 
-// Добавьте простую функцию без кеширования:
-async function getListCards(listId: number): Promise<Card[]> {
-  // Проверка на корректный ID
-  if (!listId || typeof listId !== 'number' || isNaN(listId)) {
-    console.error("Invalid list ID provided to getListCards:", listId);
-    return [];
-  }
-  
-  try {
-    return await cardService.getListCards(listId);
-  } catch (error) {
-    console.error(`Error fetching cards for list ${listId}:`, error);
-    return [];
-  }
-}
-
 const BoardPage: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
   const dispatch = useDispatch<AppDispatch>();
@@ -282,40 +267,22 @@ const BoardPage: React.FC = () => {
           const parsedBoardId = parseInt(boardId);
 
           try {
-            // Загружаем основную информацию о доске
+            // Загружаем доску с карточками (backend уже возвращает cards в составе lists)
             const boardResult = await dispatch(fetchBoard(parsedBoardId)).unwrap();
 
             if (!boardResult || !Array.isArray(boardResult.lists)) {
-              console.error("Invalid board data received:", boardResult);
+              logger.error("Invalid board data received:", boardResult);
               return;
             }
 
-            // Загружаем карточки для всех списков параллельно
-            const listsWithCards = await Promise.all(
-              boardResult.lists.map(async (list) => {
-                if (!list || typeof list.id !== 'number') {
-                  console.error("Invalid list data:", list);
-                  return { ...list, cards: [] };
-                }
-
-                try {
-                  const cards = await getListCards(list.id);
-                  return { ...list, cards: Array.isArray(cards) ? cards : [] };
-                } catch (error) {
-                  console.error(`Error loading cards for list ${list.id}:`, error);
-                  return { ...list, cards: [] }; // Возвращаем пустой список карточек при ошибке
-                }
-              })
-            );
-
-            // Обновляем доску с полученными карточками
-            dispatch(setCurrentBoard({ ...boardResult, lists: listsWithCards }));
+            // Карточки уже включены в boardResult.lists[].cards, просто устанавливаем доску
+            dispatch(setCurrentBoard(boardResult));
           } catch (error) {
-            console.error('Error loading board data:', error);
+            logger.error('Error loading board data:', error);
           }
         }
       } catch (error) {
-        console.error('Error processing board ID:', error);
+        logger.error('Error processing board ID:', error);
       }
     };
 
@@ -389,7 +356,7 @@ const BoardPage: React.FC = () => {
       setNewListTitle('');
       setIsAddingList(false);
     } catch (err) {
-      console.error('Failed to create list', err);
+      logger.error('Failed to create list', err);
     }
   };
 
@@ -423,7 +390,7 @@ const BoardPage: React.FC = () => {
       setNewCardTitle('');
       setAddingCardToList(null);
     } catch (err) {
-      console.error('Failed to create card', err);
+      logger.error('Failed to create card', err);
     }
   };
 
@@ -445,7 +412,7 @@ const BoardPage: React.FC = () => {
 
     // Проверяем, что currentBoard существует
     if (!currentBoard || !Array.isArray(currentBoard.lists)) {
-      console.error("Cannot handle drag end - board or lists are undefined");
+      logger.error("Cannot handle drag end - board or lists are undefined");
       return;
     }
 
@@ -456,7 +423,7 @@ const BoardPage: React.FC = () => {
         const lists = [...currentBoard.lists];
 
         if (!Array.isArray(lists)) {
-          console.error("Lists array is not valid");
+          logger.error("Lists array is not valid");
           return;
         }
 
@@ -464,7 +431,7 @@ const BoardPage: React.FC = () => {
         const movedList = lists[source.index];
 
         if (!movedList) {
-          console.error("Moved list is undefined");
+          logger.error("Moved list is undefined");
           return;
         }
 
@@ -497,12 +464,12 @@ const BoardPage: React.FC = () => {
           // Очищаем кеш доски
           // clearBoardCache(currentBoard.id);
       } catch (err) {
-        console.error('Failed to update list position', err);
+        logger.error('Failed to update list position', err);
         // Если была ошибка, загружаем актуальное состояние с сервера
         dispatch(fetchBoard(currentBoard.id));
       }
       } catch (error) {
-        console.error("Error handling list drag:", error);
+        logger.error("Error handling list drag:", error);
       }
     }
 
@@ -514,7 +481,7 @@ const BoardPage: React.FC = () => {
         const destListIdMatch = destination.droppableId.match(/list-(\d+)/);
 
         if (!sourceListIdMatch || !destListIdMatch) {
-          console.error("Invalid list ID format in droppable IDs");
+          logger.error("Invalid list ID format in droppable IDs");
           return;
         }
 
@@ -522,7 +489,7 @@ const BoardPage: React.FC = () => {
         const destListId = parseInt(destListIdMatch[1]);
 
         if (isNaN(sourceListId) || isNaN(destListId)) {
-          console.error("Invalid list IDs:", sourceListId, destListId);
+          logger.error("Invalid list IDs:", sourceListId, destListId);
           return;
         }
 
@@ -531,7 +498,7 @@ const BoardPage: React.FC = () => {
         const destList = currentBoard.lists.find(list => list.id === destListId);
 
         if (!sourceList || !destList) {
-          console.error("Source or destination list not found");
+          logger.error("Source or destination list not found");
           return;
         }
 
@@ -546,7 +513,7 @@ const BoardPage: React.FC = () => {
         }
 
         if (isNaN(cardId)) {
-          console.error("Invalid card ID:", draggableId);
+          logger.error("Invalid card ID:", draggableId);
           return;
         }
 
@@ -554,7 +521,7 @@ const BoardPage: React.FC = () => {
         const movedCard = sourceList.cards.find(card => card.id === cardId);
 
         if (!movedCard) {
-          console.error("Moved card not found");
+          logger.error("Moved card not found");
           return;
         }
 
@@ -628,7 +595,7 @@ const BoardPage: React.FC = () => {
       }
 
       try {
-          console.log(`Moving card ${cardId} to list ${destListId} at position ${destination.index}`);
+          logger.log(`Moving card ${cardId} to list ${destListId} at position ${destination.index}`);
         // Отправляем запрос на сервер
         await cardService.moveCard(
             cardId,
@@ -645,12 +612,12 @@ const BoardPage: React.FC = () => {
           // Очищаем кеш доски
           // clearBoardCache(currentBoard.id);
       } catch (err) {
-        console.error('Failed to update card position', err);
+        logger.error('Failed to update card position', err);
         // Если была ошибка, загружаем актуальное состояние с сервера
         dispatch(fetchBoard(currentBoard.id));
       }
       } catch (error) {
-        console.error("Error handling card drag:", error);
+        logger.error("Error handling card drag:", error);
       }
     }
   };
@@ -663,7 +630,7 @@ const BoardPage: React.FC = () => {
       await dispatch(updateBoard({ id: Number(boardId), data: updatedSettings })).unwrap();
       setSettingsModalOpen(false);
     } catch (error) {
-      console.error('Failed to update board settings:', error);
+      logger.error('Failed to update board settings:', error);
     }
   };
 
@@ -679,7 +646,7 @@ const BoardPage: React.FC = () => {
     if (!selectedCard) return;
 
     try {
-      console.log('Updating card with data:', JSON.stringify(updatedCard, null, 2));
+      logger.log('Updating card with data:', JSON.stringify(updatedCard, null, 2));
 
       // Make sure we're sending all required fields
       const cardData = {
@@ -690,11 +657,11 @@ const BoardPage: React.FC = () => {
         assignee_id: updatedCard.assignee_id
       };
 
-      console.log('Sending to API:', JSON.stringify(cardData, null, 2));
+      logger.log('Sending to API:', JSON.stringify(cardData, null, 2));
 
       // Обновляем карточку на сервере
       const response = await cardService.updateCard(selectedCard.id, cardData);
-      console.log('API response:', JSON.stringify(response, null, 2));
+      logger.log('API response:', JSON.stringify(response, null, 2));
 
       // Если запрос успешен, обновляем карточку в стейте
       if (currentBoard) {
@@ -719,7 +686,7 @@ const BoardPage: React.FC = () => {
         setSelectedCard(response);
       }
     } catch (error) {
-      console.error('Failed to update card:', error);
+      logger.error('Failed to update card:', error);
     }
   };
 
@@ -737,7 +704,7 @@ const BoardPage: React.FC = () => {
       // Находим список по ID
       const listToUpdate = currentBoard.lists.find(list => list.id === editingListId);
       if (!listToUpdate) {
-        console.error('List not found:', editingListId);
+        logger.error('List not found:', editingListId);
         return;
       }
 
@@ -759,7 +726,7 @@ const BoardPage: React.FC = () => {
       // Закрываем модальное окно
       setEditingListId(null);
     } catch (error) {
-      console.error('Failed to update list color:', error);
+      logger.error('Failed to update list color:', error);
     }
   };
 
