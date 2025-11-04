@@ -8,8 +8,6 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -28,19 +26,6 @@ services:
     depends_on:
       - backend
 
-  db:
-    image: postgres:16.0
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_DB: ${POSTGRES_DB}
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - db-data:/var/lib/postgresql/data
   redis:
     image: redis:latest
     container_name: redis_container
@@ -52,6 +37,4 @@ services:
       timeout: 10s
       retries: 5
     restart: unless-stopped
-  
-volumes:
-  db-data:
+
