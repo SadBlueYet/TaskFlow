@@ -26,5 +26,5 @@ class BoardService:
         return await self.repository.update_board(db_board, board_update)
 
     async def delete_board(self, board_id: int) -> None:
-        self.repository.delete_board(board_id)
+        await self.repository.delete_board(board_id)
 
